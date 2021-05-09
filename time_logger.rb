@@ -2,24 +2,22 @@ require 'yaml'
 require 'date'
 
 class Logger
-  def initialize(filename="time_log")
+  def initialize(filename="time_log", format="%d-%m-%y")
     @filename = filename
+    @format = "%d-%m-%y"
     File.new(@filename, "w") if !File.file? @filename
   end
   def create
     open_file('a') do |file|
-      file.write({DateTime.now.strftime("%d-%m-%y") => 0}.to_yaml)
+      file.write({DateTime.now.strftime(@format) => 0}.to_yaml)
     end
   end
   def update(mins)
     create if !record?
     lines = get_lines
-    print lines
     record = YAML.load(lines[-1])
     lines[-1] = ({record.keys[0] => record[record.keys[0]] + mins}).to_yaml
-    open_file("w") do |file|
-      file.puts lines
-    end
+    save lines
     record
   end
   def all
@@ -27,26 +25,30 @@ class Logger
       return file.readlines.map{ |line| YAML.load(line) }[1..-1]
     end
   end
-  def delete
+  def delete(date=DateTime.now.strftime(@format))
+    lines = get_lines
+    lines.delete_if {|record| YAML.load(record).keys[0] == date}
+    save lines
   end
   def sum
   end
-  def record?(date=nil)
-    record_date = date.nil? ? DateTime.now.strftime("%d-%m-%y") : date
+  def find(date)
     open_file('r') do |file|
       last_date = nil
       file.readlines.reverse.each do |line|
         record = YAML.load(line)
         return false if record.nil?
-        record.each_pair do |date, minutes|
-          parsed_date = DateTime.parse(Date.strptime(date, "%d-%m-%y").to_s)
-          return true if record_date == parsed_date.strftime("%d-%m-%y")
-          return false if !last_date.nil? && parsed_date > last_date
-          last_date = parsed_date
-        end
+        parsed_date = DateTime.parse(
+                        Date.strptime(record.keys[0], @format).to_s)
+        return record if date == parsed_date.strftime(@format)
+        return nil if !last_date.nil? && parsed_date > last_date
+        last_date = parsed_date
       end
     end
-    false
+    nil
+  end
+  def record?(date=DateTime.now.strftime(@format))
+    find_record(date).nil? ? false : true
   end
 
   private
@@ -63,5 +65,8 @@ class Logger
       file.readlines.each { |line| lines << line unless line == "---\n"}
     end
     lines
+  end
+  def save(array)
+    open_file("w") {|file| file.puts array }
   end
 end
