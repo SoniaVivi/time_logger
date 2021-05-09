@@ -7,7 +7,7 @@ view all records if no MINS present
 
        -u [none/DATE] Update last record or record at DATE(DD-MM-YY)
 
-       =v View all records
+       -v View all records
 
        -d [DATE] Deletes all records at DATE(DD-MM-YY)
 
