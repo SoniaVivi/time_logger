@@ -9,23 +9,26 @@ class Logger
   end
   def create
     open_file('a') do |file|
-      file.write({DateTime.now.strftime(@format) => 0}.to_yaml)
+      file.write({today => 0}.to_yaml)
     end
   end
-  def update(mins)
+  def update(mins, date=today)
     create if !record?
-    lines = get_lines
-    record = YAML.load(lines[-1])
-    lines[-1] = ({record.keys[0] => record[record.keys[0]] + mins}).to_yaml
-    save lines
-    record
+    lines = get_lines.reverse
+    lines.map! do |line|
+      record = YAML.load(line)
+      if record.keys[0] == date
+        ({record.keys[0] => record[record.keys[0]] + mins}).to_yaml
+      else
+        line
+      end
+    end
+    save lines.reverse
   end
   def all
-    open_file do |file|
-      return file.readlines.map{ |line| YAML.load(line) }[1..-1]
-    end
+    get_lines.map{ |line| YAML.load(line) }
   end
-  def delete(date=DateTime.now.strftime(@format))
+  def delete(date=today)
     lines = get_lines
     lines.delete_if {|record| YAML.load(record).keys[0] == date}
     save lines
@@ -60,7 +63,7 @@ class Logger
     end
     nil
   end
-  def record?(date=DateTime.now.strftime(@format))
+  def record?(date=today)
     find(date).nil? ? false : true
   end
 
@@ -76,12 +79,15 @@ class Logger
     open_file do |file|
       file.readlines.each { |line| lines << line unless line == "---\n"}
     end
-    lines
+    lines.keep_if{|entry| !entry.nil?}
   end
   def save(array)
     open_file("w") {|file| file.puts array }
   end
   def parse_date(date)
     DateTime.parse(Date.strptime(date, @format).to_s)
+  end
+  def today
+    DateTime.now.strftime(@format)
   end
 end
