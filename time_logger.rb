@@ -30,7 +30,21 @@ class Logger
     lines.delete_if {|record| YAML.load(record).keys[0] == date}
     save lines
   end
-  def sum
+  def sum(option="week")
+    total_sum = 0
+    end_date =
+    if option == "month"
+      DateTime.now.prev_month
+    elsif option == "year"
+      DateTime.now.prev_year
+    else
+      DateTime.now - 7
+    end
+    get_lines.each do |line|
+      record = YAML.load(line)
+      total_sum += record.values[0] if parse_date(record.keys[0]) >= end_date
+    end
+    total_sum
   end
   def find(date)
     open_file('r') do |file|
@@ -38,8 +52,7 @@ class Logger
       file.readlines.reverse.each do |line|
         record = YAML.load(line)
         return false if record.nil?
-        parsed_date = DateTime.parse(
-                        Date.strptime(record.keys[0], @format).to_s)
+        parsed_date = parse_date(record.keys[0])
         return record if date == parsed_date.strftime(@format)
         return nil if !last_date.nil? && parsed_date > last_date
         last_date = parsed_date
@@ -48,7 +61,7 @@ class Logger
     nil
   end
   def record?(date=DateTime.now.strftime(@format))
-    find_record(date).nil? ? false : true
+    find(date).nil? ? false : true
   end
 
   private
@@ -58,7 +71,6 @@ class Logger
     yield file
     file.close
   end
-
   def get_lines
     lines = []
     open_file do |file|
@@ -68,5 +80,8 @@ class Logger
   end
   def save(array)
     open_file("w") {|file| file.puts array }
+  end
+  def parse_date(date)
+    DateTime.parse(Date.strptime(date, @format).to_s)
   end
 end
