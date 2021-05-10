@@ -15,15 +15,17 @@ class Logger
   def update(mins, date=today)
     create if !record?
     lines = get_lines.reverse
+    new_record = nil
     lines.map! do |line|
       record = YAML.load(line)
       if record.keys[0] == date
-        ({record.keys[0] => record[record.keys[0]] + mins}).to_yaml
+        new_record = ({record.keys[0] => record[record.keys[0]] + mins}).to_yaml
       else
         line
       end
     end
     save lines.reverse
+    YAML.load(new_record)
   end
   def all
     get_lines.map{ |line| YAML.load(line) }
@@ -32,6 +34,7 @@ class Logger
     lines = get_lines
     lines.delete_if {|record| YAML.load(record).keys[0] == date}
     save lines
+    nil
   end
   def sum(option="week")
     total_sum = 0
@@ -40,6 +43,8 @@ class Logger
       DateTime.now.prev_month
     elsif option == "year"
       DateTime.now.prev_year
+    elsif option == "day"
+      DateTime.now - 1
     else
       DateTime.now - 7
     end
