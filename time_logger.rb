@@ -17,9 +17,10 @@ class Logger
       lines.sort! {|a, b| parse_date(a.keys[0]) <=> parse_date(b.keys[0])}
       save lines.map {|line| line.to_yaml}
     end
+    {date => mins}
   end
   def update(mins, date=today)
-    create(mins, date) if !record?(date)
+    return create(mins, date) if !record?(date)
     lines = get_lines.reverse
     new_record = nil
     lines.map! do |line|
