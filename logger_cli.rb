@@ -4,7 +4,7 @@ def logger_cli
   logger = Logger.new
   case ARGV[0]
   when nil, '-v'
-    logger.all.each {|data| display_record(data)}
+    display_records logger.all
   when /\d/
     display_record logger.update(ARGV[0].to_i)
   when '-u'
@@ -28,8 +28,18 @@ def logger_cli
 
 end
 
-def display_record(data)
-  print "\n#{data.keys[0]}: #{data.values[0]}\n"
+def display_record(data, separator="\n", length=13)
+  entry = "#{data.keys[0]}: #{data.values[0]}"
+  entry += " " * (length - entry.length) if entry.length < length
+  print separator, entry, separator
+end
+
+def display_records(data)
+  data.each_with_index do |entry, i|
+    i == 0 ? (print "\n| ") : (print "| ")
+    display_record entry, " "
+    (i + 1) % 3.0 == 0 && i != 0 ? (print "\n") : (print " ")
+  end
 end
 
 logger_cli
