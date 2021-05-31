@@ -7,8 +7,10 @@ def logger_cli
     display_records logger.all
   when /\d/
     display_record logger.update(ARGV[0].to_i)
+    print "\n"
   when '-u'
     display_record logger.update(ARGV[2].to_i, ARGV[1])
+    print "\n"
   when'-d'
     logger.delete ARGV[1]
   when '-s'
@@ -40,6 +42,7 @@ def display_records(data)
     display_record entry, " "
     (i + 1) % 3.0 == 0 && i != 0 ? (print "\n") : (print " ")
   end
+  print "\n"
 end
 
 logger_cli

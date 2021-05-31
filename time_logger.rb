@@ -79,17 +79,17 @@ class Logger
   end
   def average(month=DateTime.now.month)
     count = 0
-    sum = 0
-    get_lines.each do |line|
+    total = 0
+    get_lines.reverse.each do |line|
       record = YAML.load(line)
       record_month = parse_date(record.keys[0]).month
       break if record_month < month
       if record_month == month
-        sum += record.values[0]
+        total += record.values[0]
         count += 1.0
       end
     end
-    count != 0 ? sum / count : 0
+    count != 0 ? total / count : 0
   end
 
   private
