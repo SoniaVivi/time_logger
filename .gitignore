@@ -1,1 +1,6 @@
 /time_log
+*/time_log
+/node_modules
+yarn.lock
+Gemfile.lock
+spec/examples.txt
