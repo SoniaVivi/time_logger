@@ -1,6 +1,5 @@
-/time_log
-*/time_log
 /node_modules
 yarn.lock
 Gemfile.lock
 spec/examples.txt
+lib/time_log.db
