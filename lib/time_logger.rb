@@ -10,7 +10,7 @@ class Logger
     setup_database
     self
   end
-  def add(mins: 0, date: today, log_type: '')
+  def add_or_update(mins: 0, date: today, log_type: '')
     if !exists?(table: 'Logs', column: 'date', value: date)
       @connection.execute(<<~EOS)
         INSERT INTO Logs (date, minutes, log_type)
@@ -33,22 +33,6 @@ class Logger
       EOS
       @connection.execute("INSERT INTO LogTypes (name) VALUES ('#{log_type}')")
     end
-  end
-  def update(mins, date = today)
-    return create(mins, date) if !record?(date)
-    lines = get_lines.reverse
-    new_record = nil
-    lines.map! do |line|
-      record = YAML.load(line)
-      if record.keys[0] == date
-        new_record =
-          ({ record.keys[0] => record[record.keys[0]] + mins }).to_yaml
-      else
-        line
-      end
-    end
-    save lines.reverse
-    YAML.load(new_record)
   end
   def all
     get_lines.map { |line| YAML.load(line) }

@@ -27,7 +27,7 @@ RSpec.describe 'Logger' do
     expect(has_table.('LogTypes')).to eq(true)
   end
   it 'creates Log records and appropriate LogType entry' do
-    time_log.add(log_type: 'dog_walking', mins: 44)
+    time_log.add_or_update(log_type: 'dog_walking', mins: 44)
     expect(count_records.('Logs')).to eq(1)
     expect(count_records.('LogTypes')).to eq(1)
     expect(
@@ -35,8 +35,8 @@ RSpec.describe 'Logger' do
     ).to eq (44)
   end
   it 'does not create duplicate LogTypes or Logs rows' do
-    time_log.add(log_type: 'dog_walking', mins: 44)
-    time_log.add(log_type: 'dog_walking', mins: 44)
+    time_log.add_or_update(log_type: 'dog_walking', mins: 44)
+    time_log.add_or_update(log_type: 'dog_walking', mins: 44)
     expect(count_records.('Logs')).to eq(1)
     expect(
       time_log.connection.execute('SELECT minutes FROM Logs LIMIT 1')[0][0],
