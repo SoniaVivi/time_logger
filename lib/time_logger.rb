@@ -4,14 +4,35 @@ require 'date'
 class Logger
   attr_reader :connection
 
-  def initialize(kwargs = { filename: 'time_log.db', format: '%d-%m-%y' })
-    @connection = SQLite3::Database.new(kwargs[:filename])
-    @format = kwargs[:format]
+  def initialize(filename: 'time_log.db', output_format: '%d-%m-%y')
+    @connection = SQLite3::Database.new(filename)
+    @format = output_format
     setup_database
     self
   end
-  def add(mins = 0, date = today)
-    nil
+  def add(mins: 0, date: today, log_type: '')
+    if !exists?(table: 'Logs', column: 'date', value: date)
+      @connection.execute(<<~EOS)
+        INSERT INTO Logs (date, minutes, log_type)
+        VALUES (#{date}, #{mins}, '#{log_type}')
+      EOS
+    else
+      update(
+        table: 'Logs',
+        select_column: {
+          date: date,
+        },
+        update_columns: {
+          minutes: "minutes+#{mins}",
+        },
+      )
+    end
+    if @connection.execute(<<~EOS).empty?
+        SELECT 1 FROM LogTypes
+        WHERE name='#{log_type}'
+      EOS
+      @connection.execute("INSERT INTO LogTypes (name) VALUES ('#{log_type}')")
+    end
   end
   def update(mins, date = today)
     return create(mins, date) if !record?(date)
@@ -104,21 +125,30 @@ class Logger
       CREATE TABLE Logs
         (id integer primary key,
          date datetime default current_timestamp,
-         log_type integer
+         minutes integer,
+         log_type string
         )
       EOS
       CREATE TABLE LogTypes
         (id integer primary key,
-         name string,
+         name string
         )
       EOS
 
     tables.each do |table_name, sql|
       if !table?(table_name)
-        puts "Created table: #{table_name}"
         @connection.execute(sql)
+        puts "Created table: #{table_name}"
       end
     end
+  end
+  def update(table: '', select_column: {}, update_columns: {})
+    sql = <<~EOS
+            UPDATE #{table}
+            SET #{update_columns.map { |pair| pair.join('=') }.join(',')}
+            WHERE #{select_column.to_a[0][0].to_s}=#{select_column.to_a[0][1]}
+          EOS
+    @connection.execute(sql)
   end
   def table?(name)
     sql = <<~EOS
@@ -127,7 +157,15 @@ class Logger
         WHERE type='table'
         AND name='#{name}'
       EOS
-    @connection.execute(sql) != 0
+    @connection.execute(sql)[0][0] != 0
+  end
+  def exists?(table: '', column: '', value: '')
+    sql = <<~EOS
+            SELECT 1
+            FROM #{table}
+            WHERE #{column}=#{value == String ? ("'" + value.to_s + "'") : value}
+          EOS
+    !@connection.execute(sql).empty?
   end
   def open_file(mode = 'r')
     file = File.open(@filename, mode)
