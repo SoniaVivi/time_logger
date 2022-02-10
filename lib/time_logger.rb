@@ -11,10 +11,10 @@ class Logger
     self
   end
   def add_or_update(mins: 0, date: today, log_type: '')
-    if !exists?(table: 'Logs', column: 'date', value: date)
+    if !exists?(table: 'Logs', values: { date: date, log_type: log_type })
       @connection.execute(<<~EOS)
         INSERT INTO Logs (date, minutes, log_type)
-        VALUES (#{date}, #{mins}, '#{log_type}')
+        VALUES ('#{date}', #{mins}, '#{log_type}')
       EOS
     else
       update(
@@ -27,21 +27,20 @@ class Logger
         },
       )
     end
-    if @connection.execute(<<~EOS).empty?
+    if @connection.execute(<<~EOS, [log_type]).empty?
         SELECT 1 FROM LogTypes
-        WHERE name='#{log_type}'
+        WHERE name=?
       EOS
       @connection.execute("INSERT INTO LogTypes (name) VALUES ('#{log_type}')")
     end
+    self
   end
   def all
     get_lines.map { |line| YAML.load(line) }
   end
-  def delete(date = today)
-    lines = get_lines
-    lines.delete_if { |record| YAML.load(record).keys[0] == date }
-    save lines
-    nil
+  def delete(table: '', remove: {})
+    sql = "DELETE FROM #{table} WHERE #{remove.to_a[0][0]}=?"
+    @connection.execute(sql, [remove.to_a[0][1]])
   end
   def sum(option = 'week')
     total_sum = 0
@@ -130,7 +129,7 @@ class Logger
     sql = <<~EOS
             UPDATE #{table}
             SET #{update_columns.map { |pair| pair.join('=') }.join(',')}
-            WHERE #{select_column.to_a[0][0].to_s}=#{select_column.to_a[0][1]}
+            WHERE #{select_column.to_a[0][0].to_s}='#{select_column.to_a[0][1]}'
           EOS
     @connection.execute(sql)
   end
@@ -143,13 +142,15 @@ class Logger
       EOS
     @connection.execute(sql)[0][0] != 0
   end
-  def exists?(table: '', column: '', value: '')
+  def exists?(table: '', values: {})
+    where_sql = ''
+    values.each { |column, value| where_sql += "#{column}=? AND " }
     sql = <<~EOS
             SELECT 1
             FROM #{table}
-            WHERE #{column}=#{value == String ? ("'" + value.to_s + "'") : value}
+            WHERE #{where_sql[0..-6]}
           EOS
-    !@connection.execute(sql).empty?
+    !@connection.execute(sql, values.map { |_, v| v }).empty?
   end
   def open_file(mode = 'r')
     file = File.open(@filename, mode)

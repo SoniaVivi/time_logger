@@ -43,4 +43,16 @@ RSpec.describe 'Logger' do
     ).to eq (44 * 3)
     expect(count_records.('LogTypes')).to eq(1)
   end
+  it 'deletes Log records' do
+    time_log.add_or_update(log_type: 'Gaming', mins: 101)
+
+    log_quantity = count_records.('Logs')
+    log_type_quantity = count_records.('LogTypes')
+
+    time_log.delete(table: 'Logs', remove: { log_type: 'Gaming' })
+    time_log.delete(table: 'LogTypes', remove: { name: 'Gaming' })
+
+    expect(count_records.('Logs')).to be < log_quantity
+    expect(count_records.('LogTypes')).to be < log_type_quantity
+  end
 end
