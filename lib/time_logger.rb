@@ -11,32 +11,60 @@ class Logger
     self
   end
   def add_or_update(mins: 0, date: today, log_type: '')
-    if !exists?(table: 'Logs', values: { date: date, log_type: log_type })
+    formatted_date = Date.strptime(date, '%d-%m-%Y')
+    if !exists?(
+         table: 'Logs',
+         values: {
+           date: formatted_date,
+           log_type: log_type,
+         },
+       )
       @connection.execute(<<~EOS)
         INSERT INTO Logs (date, minutes, log_type)
-        VALUES ('#{date}', #{mins}, '#{log_type}')
+        VALUES ('#{formatted_date}', #{mins}, '#{log_type}')
       EOS
     else
       update(
         table: 'Logs',
         select_column: {
-          date: date,
+          date: formatted_date,
+          log_type: log_type,
         },
         update_columns: {
-          minutes: "minutes+#{mins}",
+          minutes: "minutes + #{mins}",
         },
       )
     end
-    if @connection.execute(<<~EOS, [log_type]).empty?
-        SELECT 1 FROM LogTypes
-        WHERE name=?
-      EOS
+    if !exists?(table: 'LogTypes', values: { name: log_type })
       @connection.execute("INSERT INTO LogTypes (name) VALUES ('#{log_type}')")
     end
     self
   end
-  def all
-    get_lines.map { |line| YAML.load(line) }
+  def all(display: '', width: 24, row_size: 3)
+    if display != 'LogTypes'
+      records =
+        @connection.execute(
+          'SELECT date, minutes FROM Logs WHERE log_type=? ORDER BY date ASC',
+          [display],
+        )
+      records =
+        records
+          .each_with_index
+          .map do |data, i|
+            date_segments = data[0].split('-').reverse
+            "#{[*date_segments[0..-2], date_segments[-1][-2..-1]].join('-')}: #{data[1]}"
+              .center(width) + (((i + 1) % row_size) == 0 ? "\n" : ' | ')
+          end
+          .join('')
+      return records
+    end
+    records = @connection.execute('SELECT name FROM LogTypes ORDER BY id ASC')
+    records
+      .each_with_index
+      .map do |name, i|
+        name[0].center(width) + (((i + 1) % row_size) == 0 ? "\n" : ' | ')
+      end
+      .join('')
   end
   def delete(table: '', remove: {})
     sql = "DELETE FROM #{table} WHERE #{remove.to_a[0][0]}=?"
@@ -129,7 +157,7 @@ class Logger
     sql = <<~EOS
             UPDATE #{table}
             SET #{update_columns.map { |pair| pair.join('=') }.join(',')}
-            WHERE #{select_column.to_a[0][0].to_s}='#{select_column.to_a[0][1]}'
+            WHERE #{to_sql(select_column)}
           EOS
     @connection.execute(sql)
   end
@@ -143,14 +171,18 @@ class Logger
     @connection.execute(sql)[0][0] != 0
   end
   def exists?(table: '', values: {})
-    where_sql = ''
-    values.each { |column, value| where_sql += "#{column}=? AND " }
+    where_sql = to_sql values
     sql = <<~EOS
             SELECT 1
             FROM #{table}
-            WHERE #{where_sql[0..-6]}
+            WHERE #{where_sql}
           EOS
-    !@connection.execute(sql, values.map { |_, v| v }).empty?
+    !@connection.execute(sql).empty?
+  end
+  def to_sql(conditions)
+    where_sql = ''
+    conditions.each { |column, value| where_sql += "#{column}='#{value}' AND " }
+    where_sql[0..-6]
   end
   def open_file(mode = 'r')
     file = File.open(@filename, mode)
@@ -168,10 +200,10 @@ class Logger
     open_file('w') { |file| file.puts array }
   end
   def parse_date(date)
-    DateTime.parse(Date.strptime(date, @format).to_s)
+    Date.strptime(date, @format)
   end
   def today
-    DateTime.now.strftime(@format)
+    DateTime.now.strftime('%d-%m-%Y')
   end
   def month_start(date = DateTime.now)
     parse_date(date.strftime('01-%m-%Y'))

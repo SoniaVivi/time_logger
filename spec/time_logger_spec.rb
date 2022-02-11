@@ -55,4 +55,22 @@ RSpec.describe 'Logger' do
     expect(count_records.('Logs')).to be < log_quantity
     expect(count_records.('LogTypes')).to be < log_type_quantity
   end
+  it 'displays all records' do
+    time_log.add_or_update(log_type: 'dog_walking', mins: 44, date: '01-01-01')
+    time_log.add_or_update(log_type: 'dog_walking', mins: 44, date: '02-02-02')
+    time_log.add_or_update(log_type: 'dog_walking', mins: 44, date: '03-03-03')
+
+    expect(time_log.all(display: 'dog_walking', width: 20, row_size: 3)).to eq(
+      ['01-01-01: 44', '02-02-02: 44', '03-03-03: 44'].map { |text|
+        text.center(20)
+      }.join(' | ') +
+        "\n#{"#{DateTime.now.strftime('%d-%m-%y')}: 132".center(20)} | ",
+    )
+
+    time_log.add_or_update(log_type: 'Gaming', mins: 45, date: '03-03-03')
+
+    expect(time_log.all(display: 'LogTypes', width: 40, row_size: 1)).to eq(
+      %w[dog_walking Gaming].map { |text| text.center(40) + "\n" }.join(''),
+    )
+  end
 end
