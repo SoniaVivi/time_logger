@@ -1,5 +1,6 @@
 require 'sqlite3'
 require 'date'
+require 'time'
 
 class Logger
   attr_reader :connection
@@ -11,7 +12,7 @@ class Logger
     self
   end
   def add_or_update(mins: 0, date: today, log_type: '')
-    formatted_date = Date.strptime(date, '%d-%m-%Y')
+    formatted_date = format_date(date)
     if !exists?(
          table: 'Logs',
          values: {
@@ -70,23 +71,39 @@ class Logger
     sql = "DELETE FROM #{table} WHERE #{remove.to_a[0][0]}=?"
     @connection.execute(sql, [remove.to_a[0][1]])
   end
-  def sum(option = 'week')
-    total_sum = 0
-    end_date =
-      if option == 'month'
-        month_start
-      elsif option == 'year'
-        parse_date(today).prev_year
-      elsif option == 'day'
-        parse_date(today) - 1
-      else
-        parse_date(today) - 7
-      end
-    get_lines.each do |line|
-      record = YAML.load(line)
-      total_sum += record.values[0] if parse_date(record.keys[0]) >= end_date
-    end
-    total_sum
+  def sum(log_type: '', option: '', start: nil)
+    sql =
+      'SELECT sum(minutes) FROM Logs WHERE log_type=? AND date>=? AND date<?'
+    case option
+    when 'year'
+      @connection.execute(
+        sql,
+        [
+          log_type,
+          format_date('01-01-' + start.to_s).to_s,
+          (format_date('01-01-' + start.to_s) + 365).to_s,
+        ],
+      )
+    when 'all_time'
+      @connection.execute(
+        'SELECT sum(minutes) FROM Logs WHERE log_type=?',
+        [log_type],
+      )
+    when 'month'
+      @connection.execute(
+        sql,
+        [
+          log_type,
+          format_date('01-' + start).to_s,
+          (format_date('01-' + start) + 30).to_s,
+        ],
+      )
+    else
+      @connection.execute(
+        sql,
+        [log_type, month_start.to_s, (format_date(today) + 1).to_s],
+      )
+    end[0][0] # prettier-ignore
   end
   def find(date)
     open_file('r') do |file|
@@ -198,6 +215,9 @@ class Logger
   end
   def save(array)
     open_file('w') { |file| file.puts array }
+  end
+  def format_date(date)
+    Date.strptime(date, '%d-%m-%Y')
   end
   def parse_date(date)
     Date.strptime(date, @format)

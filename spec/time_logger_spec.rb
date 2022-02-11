@@ -73,4 +73,16 @@ RSpec.describe 'Logger' do
       %w[dog_walking Gaming].map { |text| text.center(40) + "\n" }.join(''),
     )
   end
+  it 'returns sum of all records with X log_type' do
+    expect(time_log.sum(log_type: 'dog_walking')).to eq(44 * 3)
+    expect(
+      time_log.sum(log_type: 'dog_walking', option: 'month', start: '01-01'),
+    ).to eq(44)
+    expect(
+      time_log.sum(log_type: 'dog_walking', option: 'year', start: 03),
+    ).to eq(44)
+    expect(time_log.sum(log_type: 'dog_walking', option: 'all_time')).to eq(
+      44 * 6,
+    )
+  end
 end
