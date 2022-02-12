@@ -85,4 +85,11 @@ RSpec.describe 'Logger' do
       44 * 6,
     )
   end
+  it 'returns average of all records with X log_type' do
+    time_log.add_or_update(log_type: 'dog_walking', mins: 44, date: '01-01-01')
+    time_log.add_or_update(log_type: 'dog_walking', mins: 44, date: '01-01-01')
+    expect(
+      time_log.average(log_type: 'dog_walking', option: 'year', start: '01'),
+    ).to eq(44.0 * 3)
+  end
 end

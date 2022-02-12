@@ -72,38 +72,20 @@ class Logger
     @connection.execute(sql, [remove.to_a[0][1]])
   end
   def sum(log_type: '', option: '', start: nil)
-    sql =
-      'SELECT sum(minutes) FROM Logs WHERE log_type=? AND date>=? AND date<?'
-    case option
-    when 'year'
-      @connection.execute(
-        sql,
-        [
-          log_type,
-          format_date('01-01-' + start.to_s).to_s,
-          (format_date('01-01-' + start.to_s) + 365).to_s,
-        ],
-      )
-    when 'all_time'
-      @connection.execute(
-        'SELECT sum(minutes) FROM Logs WHERE log_type=?',
-        [log_type],
-      )
-    when 'month'
-      @connection.execute(
-        sql,
-        [
-          log_type,
-          format_date('01-' + start).to_s,
-          (format_date('01-' + start) + 30).to_s,
-        ],
-      )
-    else
-      @connection.execute(
-        sql,
-        [log_type, month_start.to_s, (format_date(today) + 1).to_s],
-      )
-    end[0][0] # prettier-ignore
+    aggregate(
+      aggregate_function: 'sum',
+      log_type: log_type,
+      option: option,
+      start: start,
+    )
+  end
+  def average(log_type: '', option: '', start: nil)
+    aggregate(
+      aggregate_function: 'avg',
+      log_type: log_type,
+      option: option,
+      start: start,
+    )
   end
   def find(date)
     open_file('r') do |file|
@@ -124,20 +106,6 @@ class Logger
   end
   def record?(date = today)
     !find(date).nil?
-  end
-  def average(month = DateTime.now.month)
-    count = 0
-    total = 0
-    get_lines.reverse.each do |line|
-      record = YAML.load(line)
-      record_month = parse_date(record.keys[0]).month
-      break if record_month < month
-      if record_month == month
-        total += record.values[0]
-        count += 1.0
-      end
-    end
-    count != 0 ? total / count : 0
   end
 
   private
@@ -195,6 +163,45 @@ class Logger
             WHERE #{where_sql}
           EOS
     !@connection.execute(sql).empty?
+  end
+  def aggregate(log_type: '', option: '', start: nil, aggregate_function: '')
+    sql = <<~EOS
+            SELECT #{aggregate_function}(minutes)
+            FROM Logs
+            WHERE log_type=?
+            AND date>=? AND date<?
+          EOS
+
+    case option
+  when 'year'
+    @connection.execute(
+      sql,
+      [
+        log_type,
+        format_date('01-01-' + start.to_s).to_s,
+        (format_date('01-01-' + start.to_s) + 365).to_s,
+      ],
+    )
+  when 'all_time'
+    @connection.execute(
+      "SELECT #{aggregate_function}(minutes) FROM Logs WHERE log_type=?",
+      [log_type],
+    )
+  when 'month'
+    @connection.execute(
+      sql,
+      [
+        log_type,
+        format_date('01-' + start).to_s,
+        (format_date('01-' + start) + 30).to_s,
+      ],
+    )
+  else
+    @connection.execute(
+      sql,
+      [log_type, month_start.to_s, (format_date(today) + 1).to_s],
+    )
+  end[0][0] # prettier-ignore
   end
   def to_sql(conditions)
     where_sql = ''
