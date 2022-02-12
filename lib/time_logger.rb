@@ -94,26 +94,6 @@ class Logger
       add_or_update(log_type: log_type, date: parse_date(date), mins: minutes)
     end
   end
-  def find(date)
-    open_file('r') do |file|
-      last_date = nil
-      file
-        .readlines
-        .reverse
-        .each do |line|
-          record = YAML.load(line)
-          return nil if record.nil?
-          parsed_date = parse_date(record.keys[0])
-          return record if date == parsed_date.strftime(@format)
-          return nil if !last_date.nil? && parsed_date > last_date
-          last_date = parsed_date
-        end
-    end
-    nil
-  end
-  def record?(date = today)
-    !find(date).nil?
-  end
 
   private
 
@@ -180,55 +160,47 @@ class Logger
           EOS
 
     case option
-  when 'year'
-    @connection.execute(
-      sql,
-      [
-        log_type,
-        format_date('01-01-' + start.to_s).to_s,
-        (format_date('01-01-' + start.to_s) + 365).to_s,
-      ],
-    )
-  when 'all_time'
-    @connection.execute(
-      "SELECT #{aggregate_function}(minutes) FROM Logs WHERE log_type=?",
-      [log_type],
-    )
-  when 'month'
-    @connection.execute(
-      sql,
-      [
-        log_type,
-        format_date('01-' + start).to_s,
-        (format_date('01-' + start) + 30).to_s,
-      ],
-    )
-  else
-    @connection.execute(
-      sql,
-      [log_type, month_start.to_s, (format_date(today) + 1).to_s],
-    )
-  end[0][0] # prettier-ignore
+    when 'year'
+      @connection.execute(
+        sql,
+        [
+          log_type,
+          format_date('01-01-' + start.to_s).to_s,
+          (format_date('01-01-' + start.to_s) + 365).to_s,
+        ],
+      )
+    when 'all_time'
+      @connection.execute(
+        "SELECT #{aggregate_function}(minutes) FROM Logs WHERE log_type=?",
+        [log_type],
+      )
+    when 'month'
+      @connection.execute(
+        sql,
+        [
+          log_type,
+          format_date('01-' + start).to_s,
+          (format_date('01-' + start) + 30).to_s,
+        ],
+      )
+    else
+      @connection.execute(
+        sql,
+        [log_type, month_start.to_s, (format_date(today) + 1).to_s],
+      )
+    end[0][0] # prettier-ignore
   end
   def to_sql(conditions)
     where_sql = ''
     conditions.each { |column, value| where_sql += "#{column}='#{value}' AND " }
     where_sql[0..-6]
   end
-  def open_file(filename)
-    file = File.open(filename, 'r')
-    yield file
-    file.close
-  end
   def get_lines(filename)
     lines = []
-    open_file(filename) do |file|
-      file.readlines.each { |line| lines << line unless line == "---\n" }
-    end
+    file = File.open(filename, 'r')
+    file.readlines.each { |line| lines << line unless line == "---\n" }
+    file.close
     lines.keep_if { |entry| !entry.nil? }
-  end
-  def save(array)
-    open_file('w') { |file| file.puts array }
   end
   def format_date(date)
     Date.strptime(date, '%d-%m-%Y')
