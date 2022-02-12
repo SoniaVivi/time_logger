@@ -94,6 +94,29 @@ class Logger
       add_or_update(log_type: log_type, date: parse_date(date), mins: minutes)
     end
   end
+  def set_user_preference(name: '', new_val: '')
+    update(
+      table: 'UserPreferences',
+      select_column: {
+        name: name,
+      },
+      update_columns: {
+        val: new_val,
+      },
+    )
+  end
+  def get_user_preference(name: '')
+    result =
+      @connection.execute('SELECT * from UserPreferences WHERE name=?', [name])[
+        0
+      ]
+    return result if name != 'default_log_type'
+    if result[1].length == 0
+      @connection.execute('SELECT name FROM LogTypes LIMIT 1')
+    else
+      result
+    end
+  end
 
   private
 
@@ -104,7 +127,7 @@ class Logger
       EOS
   end
   def setup_database
-    tables = { Logs: <<~EOS, LogTypes: <<~EOS }
+    tables = { Logs: <<~EOS, LogTypes: <<~EOS, UserPreferences: <<~EOS }
       CREATE TABLE Logs
         (id integer primary key,
          date datetime default current_timestamp,
@@ -116,6 +139,24 @@ class Logger
         (id integer primary key,
          name string
         )
+      EOS
+      CREATE TABLE UserPreferences
+        (id integer primary key,
+         name string,
+         val string
+        );
+      INSERT INTO UserPreferences (name, val)
+      VALUES (row_size, 3);
+      INSERT INTO UserPreferences (name, val)
+      VALUES (width, 24);
+      INSERT INTO UserPreferences (name, val)
+      VALUES (default_log_type, "");
+      INSERT INTO UserPreferences (name, val)
+      VALUES (time_unit, minutes);
+      INSERT INTO UserPreferences (name, val)
+      VALUES (kanji, false);
+      INSERT INTO UserPreferences (name, val)
+      VALUES (hiragana, false);
       EOS
 
     tables.each do |table_name, sql|
@@ -131,6 +172,7 @@ class Logger
             SET #{update_columns.map { |pair| pair.join('=') }.join(',')}
             WHERE #{to_sql(select_column)}
           EOS
+
     @connection.execute(sql)
   end
   def table?(name)
