@@ -92,4 +92,16 @@ RSpec.describe 'Logger' do
       time_log.average(log_type: 'dog_walking', option: 'year', start: '01'),
     ).to eq(44.0 * 3)
   end
+  it 'imports entries from YAML' do
+    quantity = count_records.('Logs')
+    time_log.import_from_yaml(log_type: 'Maille')
+    expect(count_records.('Logs')).to eq (quantity + 3)
+    expect(time_log.all(display: 'Maille', width: 20, row_size: 3)).to eq(
+      (
+        ['01-01-21: 10', '08-05-21: 10'].map { |text| text.center(20) } + [
+          '09-05-21: 297'.center(20) + "\n",
+        ]
+      ).join(' | '),
+    )
+  end
 end

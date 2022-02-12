@@ -12,7 +12,7 @@ class Logger
     self
   end
   def add_or_update(mins: 0, date: today, log_type: '')
-    formatted_date = format_date(date)
+    formatted_date = date.class == String ? format_date(date) : date.to_s
     if !exists?(
          table: 'Logs',
          values: {
@@ -86,6 +86,13 @@ class Logger
       option: option,
       start: start,
     )
+  end
+  def import_from_yaml(log_type: '', filename: 'time_log')
+    get_lines(filename).each do |entry|
+      date = entry.match(/(?<='|)[\d-]+(?=':|:)/).to_s
+      minutes = entry.match(/(?<=: )\d+(?=\n)/).to_s
+      add_or_update(log_type: log_type, date: parse_date(date), mins: minutes)
+    end
   end
   def find(date)
     open_file('r') do |file|
@@ -208,14 +215,14 @@ class Logger
     conditions.each { |column, value| where_sql += "#{column}='#{value}' AND " }
     where_sql[0..-6]
   end
-  def open_file(mode = 'r')
-    file = File.open(@filename, mode)
+  def open_file(filename)
+    file = File.open(filename, 'r')
     yield file
     file.close
   end
-  def get_lines
+  def get_lines(filename)
     lines = []
-    open_file do |file|
+    open_file(filename) do |file|
       file.readlines.each { |line| lines << line unless line == "---\n" }
     end
     lines.keep_if { |entry| !entry.nil? }
