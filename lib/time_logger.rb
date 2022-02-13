@@ -1,6 +1,7 @@
 require 'sqlite3'
 require 'date'
 require 'time'
+require 'number_to_kanji'
 
 class Logger
   attr_reader :connection
@@ -41,7 +42,7 @@ class Logger
     end
     self
   end
-  def all(display: '', width: 24, row_size: 3)
+  def all(display: '', width: 24, row_size: 3, display_kanji: false)
     if display != 'LogTypes'
       records =
         @connection.execute(
@@ -52,8 +53,9 @@ class Logger
         records
           .each_with_index
           .map do |data, i|
+            minutes = display_kanji ? NumberToKanji.call(data[1]) : data[1]
             date_segments = data[0].split('-').reverse
-            "#{[*date_segments[0..-2], date_segments[-1][-2..-1]].join('-')}: #{data[1]}"
+            "#{[*date_segments[0..-2], date_segments[-1][-2..-1]].join('-')}: #{minutes}"
               .center(width) + (((i + 1) % row_size) == 0 ? "\n" : ' | ')
           end
           .join('')
@@ -68,8 +70,8 @@ class Logger
       .join('')
   end
   def delete(table: '', remove: {})
-    sql = "DELETE FROM #{table} WHERE #{remove.to_a[0][0]}=?"
-    @connection.execute(sql, [remove.to_a[0][1]])
+    sql = "DELETE FROM #{table} WHERE #{to_sql(remove)}"
+    @connection.execute(sql)
   end
   def sum(log_type: '', option: '', start: nil)
     aggregate(
@@ -101,21 +103,35 @@ class Logger
         name: name,
       },
       update_columns: {
-        val: new_val,
+        val: "'#{new_val}'",
       },
     )
   end
+  def get_preferences(preferences: [])
+    preferences.map { |name| get_user_preference(name: name) }
+  end
   def get_user_preference(name: '')
     result =
-      @connection.execute('SELECT * from UserPreferences WHERE name=?', [name])[
+      @connection.execute(
+        'SELECT val from UserPreferences WHERE name=?',
+        [name],
+      )[
+        0
+      ][
         0
       ]
     return result if name != 'default_log_type'
-    if result[1].length == 0
-      @connection.execute('SELECT name FROM LogTypes LIMIT 1')
+    if result.empty?
+      r = @connection.execute('SELECT name FROM LogTypes LIMIT 1')
+      r.empty? ? r : r[0][0]
     else
       result
     end
+  end
+  def format_date(date)
+    return nil if date.nil?
+    str = Date.strptime(date, '%d-%m-%y')
+    str
   end
 
   private
@@ -144,25 +160,29 @@ class Logger
         (id integer primary key,
          name string,
          val string
-        );
-      INSERT INTO UserPreferences (name, val)
-      VALUES (row_size, 3);
-      INSERT INTO UserPreferences (name, val)
-      VALUES (width, 24);
-      INSERT INTO UserPreferences (name, val)
-      VALUES (default_log_type, "");
-      INSERT INTO UserPreferences (name, val)
-      VALUES (time_unit, minutes);
-      INSERT INTO UserPreferences (name, val)
-      VALUES (kanji, false);
-      INSERT INTO UserPreferences (name, val)
-      VALUES (hiragana, false);
+        )
       EOS
 
     tables.each do |table_name, sql|
       if !table?(table_name)
         @connection.execute(sql)
         puts "Created table: #{table_name}"
+        if table_name == :UserPreferences
+          [
+            "INSERT INTO UserPreferences (name, val)
+            VALUES ('row_size', '3');",
+            "INSERT INTO UserPreferences (name, val)
+            VALUES ('width', '24');",
+            "INSERT INTO UserPreferences (name, val)
+            VALUES ('default_log_type', '');",
+            "INSERT INTO UserPreferences (name, val)
+            VALUES ('time_unit', 'minutes');",
+            "INSERT INTO UserPreferences (name, val)
+            VALUES ('kanji', 'false');",
+            "INSERT INTO UserPreferences (name, val)
+            VALUES ('motivational_message', '');",
+          ].each { |sql| @connection.execute(sql) }
+        end
       end
     end
   end
@@ -244,14 +264,11 @@ class Logger
     file.close
     lines.keep_if { |entry| !entry.nil? }
   end
-  def format_date(date)
-    Date.strptime(date, '%d-%m-%Y')
-  end
   def parse_date(date)
     Date.strptime(date, @format)
   end
   def today
-    DateTime.now.strftime('%d-%m-%Y')
+    DateTime.now.strftime('%d-%m-%y')
   end
   def month_start(date = DateTime.now)
     parse_date(date.strftime('01-%m-%Y'))
