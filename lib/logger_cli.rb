@@ -1,21 +1,48 @@
+require 'number_to_kanji'
 require_relative 'time_logger'
 
 def logger_cli
   logger = Logger.new
   is_length = ->(length) { ARGV.length == length }
-  width, default_log_type, row_size, motivational_message =
+  width, default_log_type, row_size, motivational_message, display_kanji =
     logger.get_preferences(
-      preferences: %w[width default_log_type row_size motivational_message],
+      preferences: %w[
+        width
+        default_log_type
+        row_size
+        motivational_message
+        kanji
+      ],
     )
-  display_last = -> do
-    data =
-      logger.connection.execute(
-        'SELECT id, date, minutes, log_type FROM Logs ORDER BY id DESC LIMIT 1',
-      )[
-        0
-      ]
-    puts "Date: #{data[1]} | Minutes: #{data[2]} | Log Type: #{data[3]}"
-    puts motivational_message if motivational_message
+  display_kanji = display_kanji == 'true' ? true : false
+  display = ->(date: nil, log_type: nil) do
+    data = logger.connection.execute(<<~EOS)[0]
+        SELECT id,
+               date,
+               minutes,
+               log_type
+        FROM Logs
+        #{
+          if date.nil?
+            ''
+          else
+            " WHERE id=#{
+              logger.connection.execute(
+                'SELECT id FROM Logs WHERE date=? AND log_type=?',
+                [logger.format_date(date).to_s, log_type],
+              )[
+                0
+              ][
+                0
+              ]
+            } "
+          end
+        } ORDER BY id DESC LIMIT 1
+        EOS
+
+    minutes = display_kanji ? NumberToKanji.call(data[2]) : data[2]
+    print "Date: #{data[1]} | Minutes: #{minutes} | Log Type: #{data[3]}"
+    (print "\n#{motivational_message}\n") if motivational_message
   end
 
   case ARGV[0]
@@ -30,13 +57,11 @@ def logger_cli
       mins: ARGV[0].to_i,
       log_type: is_length.(2) ? ARGV[1].to_s : default_log_type,
     )
-    display_last.()
+    display.()
   when '-u'
-    logger.add_or_update(
-      date: ARGV[1],
-      mins: ARGV[2].to_i,
-      log_type: is_length.(4) ? ARGV[3] : default_log_type,
-    )
+    log_type = is_length.(4) ? ARGV[3] : default_log_type
+    logger.add_or_update(date: ARGV[1], mins: ARGV[2].to_i, log_type: log_type)
+    display.(date: ARGV[1], log_type: log_type)
   when '-d'
     logger.delete(
       table: 'Logs',
@@ -74,7 +99,6 @@ def logger_cli
            default_log_type
            time_unit
            kanji
-           hiragana
            motivational_message
          ].map { |pref_name|
            "#{pref_name}: #{logger.get_user_preference(name: pref_name)}"

@@ -178,8 +178,6 @@ class Logger
             "INSERT INTO UserPreferences (name, val)
             VALUES ('kanji', 'false');",
             "INSERT INTO UserPreferences (name, val)
-            VALUES ('hiragana', 'false');",
-            "INSERT INTO UserPreferences (name, val)
             VALUES ('motivational_message', '');",
           ].each { |sql| @connection.execute(sql) }
         end
