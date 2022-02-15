@@ -1,23 +1,19 @@
 # Time Logger
 
-Basic program that logs minutes per day spent doing anything you wish
+CLI to log time spent doing activities.
+
+## Features
+
+- Support for tracking any number of activities.
+
+- Display average and sum for activities.
+
+- Ability to set preferences, such as displaying numbers in kanji or showing a motivational message when adding or creating an entry.
+
+**Installing**
+
+Clone repository then run `bundle install` and `yarn`.
 
 **Usage**
 
 Run `ruby logger_cli.rb [OPTIONS]`
-
-**Options**
-
--v: View all records
-
-[MINS]: Create or update entry for today
-
--u [DATE] [MINS]: Update record at DATE (DD-MM-YY) or creates record at DATE if does not exist
-
--d [DATE]: Deletes records at DATE (DD-MM-YY)
-
--s [none/-day/-week/-month/-year] [none/-mins/-hours] Total time for last X amount of time
-
--avg [none/month index] Average for current month or at month index (ex. May == 5)
-
-no arguments: same as -v
