@@ -15,33 +15,9 @@ def logger_cli
       ],
     )
   display_kanji = display_kanji == 'true' ? true : false
-  display = ->(date: nil, log_type: nil) do
-    data = logger.connection.execute(<<~EOS)[0]
-        SELECT id,
-               date,
-               minutes,
-               log_type
-        FROM Logs
-        #{
-          if date.nil?
-            ''
-          else
-            " WHERE id=#{
-              logger.connection.execute(
-                'SELECT id FROM Logs WHERE date=? AND log_type=?',
-                [logger.format_date(date).to_s, log_type],
-              )[
-                0
-              ][
-                0
-              ]
-            } "
-          end
-        } ORDER BY id DESC LIMIT 1
-        EOS
-
-    minutes = display_kanji ? NumberToKanji.call(data[2]) : data[2]
-    print "Date: #{data[1]} | Minutes: #{minutes} | Log Type: #{data[3]}"
+  display = ->(data) do
+    minutes = display_kanji ? NumberToKanji.call(data[1]) : data[1]
+    print "Date: #{data[0]} | Minutes: #{data[1]} | Log Type: #{data[2]}"
     (print "\n#{motivational_message}\n") if motivational_message
   end
 
@@ -54,15 +30,17 @@ def logger_cli
            display_kanji: display_kanji,
          )
   when /\d/
-    logger.add_or_update(
-      mins: ARGV[0].to_i,
-      log_type: is_length.(2) ? ARGV[1].to_s : default_log_type,
-    )
-    display.()
+    log_type = is_length.(2) ? ARGV[1].to_s : default_log_type
+    display.(logger.add_or_update(mins: ARGV[0].to_i, log_type: log_type))
   when '-u'
     log_type = is_length.(4) ? ARGV[3] : default_log_type
-    logger.add_or_update(date: ARGV[1], mins: ARGV[2].to_i, log_type: log_type)
-    display.(date: ARGV[1], log_type: log_type)
+    display.(
+      logger.add_or_update(
+        date: ARGV[1],
+        mins: ARGV[2].to_i,
+        log_type: log_type,
+      ),
+    )
   when '-d'
     logger.delete(
       table: 'Logs',

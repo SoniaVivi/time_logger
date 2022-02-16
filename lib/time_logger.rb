@@ -40,7 +40,13 @@ class Logger
     if !exists?(table: 'LogTypes', values: { name: log_type })
       @connection.execute("INSERT INTO LogTypes (name) VALUES ('#{log_type}')")
     end
-    self
+    @connection.execute(<<~EOS, [formatted_date.to_s, log_type])[0]
+      SELECT date,
+             minutes,
+             log_type
+      FROM Logs
+      WHERE date=? AND log_type=?
+    EOS
   end
   def all(display: '', width: 24, row_size: 3, display_kanji: false)
     if display != 'LogTypes'
