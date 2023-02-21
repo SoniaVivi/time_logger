@@ -75,6 +75,9 @@ class Logger
       end
       .join('')
   end
+  def get_day(log_type: '', day: today)
+    @connection.execute('SELECT minutes FROM Logs WHERE date=?', [day])
+  end
   def delete(table: '', remove: {})
     sql = "DELETE FROM #{table} WHERE #{to_sql(remove)}"
     @connection.execute(sql)
@@ -139,6 +142,36 @@ class Logger
     str = Date.strptime(date, '%d-%m-%y')
     str
   end
+  def timestamp(log_type, end_time_adjustment = 0)
+    if !exists?(table: 'TimeStamps', values: { log_type: log_type })
+      @connection.execute(
+        'INSERT INTO TimeStamps (log_type) VALUES (?);',
+        [log_type],
+      )
+    else
+      data =
+        DateTime.strptime(
+          @connection.execute(
+            'SELECT date FROM TimeStamps WHERE log_type=?',
+            [log_type],
+          )[
+            0
+          ][
+            0
+          ],
+          '%Y-%m-%d %H:%M:%s',
+        )
+      delete(table: 'TimeStamps', remove: { log_type: log_type })
+      return(
+        add_or_update(
+          mins: ((DateTime.now - data) * 24 * 60).to_i + end_time_adjustment,
+          date: today,
+          log_type: log_type,
+        )
+      )
+    end
+    nil
+  end
 
   private
 
@@ -149,7 +182,8 @@ class Logger
       EOS
   end
   def setup_database
-    tables = { Logs: <<~EOS, LogTypes: <<~EOS, UserPreferences: <<~EOS }
+    tables = {
+      Logs: <<~EOS,
       CREATE TABLE Logs
         (id integer primary key,
          date datetime default current_timestamp,
@@ -157,17 +191,27 @@ class Logger
          log_type string
         )
       EOS
+      LogTypes: <<~EOS,
       CREATE TABLE LogTypes
         (id integer primary key,
          name string
         )
       EOS
+      UserPreferences: <<~EOS,
       CREATE TABLE UserPreferences
         (id integer primary key,
          name string,
          val string
         )
       EOS
+      TimeStamps: <<~EOS,
+      CREATE TABLE TimeStamps
+        (id integer primary key,
+         date datetime default current_timestamp,
+         log_type string
+        )
+      EOS
+    }
 
     tables.each do |table_name, sql|
       if !table?(table_name)

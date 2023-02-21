@@ -32,6 +32,10 @@ def logger_cli
   when /\d/
     log_type = is_length.(2) ? ARGV[1].to_s : default_log_type
     display.(logger.add_or_update(mins: ARGV[0].to_i, log_type: log_type))
+  when '-ts'
+    log_type = is_length.(2) ? ARGV[1].to_s : default_log_type
+    res = logger.timestamp(log_type)
+    display.(res) if !res.nil?
   when '-u'
     log_type = is_length.(4) ? ARGV[3] : default_log_type
     display.(
@@ -92,7 +96,11 @@ def logger_cli
     puts <<-EOS
   [MINS] [NONE/LOG TYPE]
     Create or update entry for today with default log type or LOG TYPE
-  -v [NONE/LOG TYPE/-log_types]
+  -ts [NONE/LOG TYPE]
+    If it's the first time being ran with LOG TYPE, creates a timestamp
+    If it's the second time, adds the difference between the two
+    timestamps to LOG TYPE. Deletes the timestamp for LOG TYPE afterwards
+  -v [NONE/LOG TYPE/LogTypes]
     View records of default log type
     View records of LOG TYPE
     View all log types

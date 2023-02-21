@@ -104,4 +104,10 @@ RSpec.describe 'Logger' do
       ).join(' | '),
     )
   end
+  it 'updates time by difference between first and second time ran' do
+    initial_time = time_log.add_or_update(log_type: 'dog_walking', mins: 44)
+    time_log.timestamp('dog_walking')
+    result = time_log.timestamp('dog_walking', 10)
+    expect(result[1].to_i - initial_time[1].to_i).to eq(10)
+  end
 end
