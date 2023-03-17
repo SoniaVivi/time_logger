@@ -71,7 +71,7 @@ class Logger
     records
       .each_with_index
       .map do |name, i|
-        name[0].center(width) + (((i + 1) % row_size) == 0 ? "\n" : ' | ')
+        name[0].to_s.center(width) + (((i + 1) % row_size) == 0 ? "\n" : ' | ')
       end
       .join('')
   end
